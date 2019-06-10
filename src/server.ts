@@ -1,6 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import {filterImageFromURL, deleteLocalFiles} from './util/util';
+import fs from 'fs';
 
 (async () => {
 
@@ -33,9 +34,36 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
   
   // Root Endpoint
   // Displays a simple message to the user
-  app.get( "/", async ( req, res ) => {
-    res.send("try GET /filteredimage?image_url={{}}")
-  } );
+  app.get( "/filteredimage", async ( req, res ) => {
+
+    const { 
+      image_url 
+    } = req.query;
+    
+    // validate the image_url query
+    if(!image_url) {
+      return res.status(400).send({ message: 'image not found' }) 
+    }
+      
+    // call filterImageFromURL(image_url) to filter the image
+    const filteredpath = await filterImageFromURL(image_url);
+    
+    if(!filteredpath) {
+      return res.status(422).send({ message: 'unable to process image for filtering' })
+    }
+     
+    let imagePathArr: string[] = [];
+    imagePathArr.push(filteredpath);
+
+    var stream = fs.createReadStream(filteredpath);
+
+    stream.once("close", function () {
+      stream.destroy(); // makesure stream closed, not close if download aborted.
+      deleteLocalFiles(imagePathArr); // deletes any files on the server on finish of the response
+    }).pipe(res.status(200));
+    // res.status(200).sendFile(filteredpath);   
+  
+  });
   
 
   // Start the Server
